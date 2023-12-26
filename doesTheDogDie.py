@@ -18,7 +18,7 @@ PLEX_URL = os.getenv('PLEX_URL') + ":32400/"
 PLEX_KEY = os.getenv('PLEX_KEY')
 
 # TODO #1 Move me to a place where I can be changed easily
-excludedLibraries = [10,13,14]
+excludedLibraries = ['10','13','14','4']
 triggerIDWarn = [201,326]
 TriggerIDAlert = [182,292]
 triggerIDList = triggerIDWarn + TriggerIDAlert
@@ -111,7 +111,7 @@ def mediaCheck(plexitem):
 
     def mediaMatch(mediaItem,searchResults):
         confidence = 0
-        # Creat confidence score for results.
+        # Create confidence score for results.
         for result in searchResults['items']:
             confidence = 0
             while confidence < 100:
@@ -195,19 +195,6 @@ headers = {
   'Accept': 'application/json',
   'X-Plex-Token': PLEX_KEY
   }
-"""
-response = requests.get(PLEX_URL + 'library/metadata/2', headers=headers)
-movieDetails = json.loads(response.content)
-
-libID = 1 # Movie library
-movieID = 2 # 22 Jump Street, testing
-updateFieldName = 'audienceRating'
-updateValue = 102
-request = f'library/sections/{libID}/all?type=1&id={movieID}&includeExternalMedia=1&{updateFieldName}.value={updateValue}'
-attemptUpdate = requests.put(PLEX_URL + request, headers=headers)
-print(attemptUpdate)
-"""
-
 """ Fields
 RatingKey - Cannot be changed
 audienceRating - INT No limit on input though?
@@ -236,7 +223,7 @@ artist - Audio media (podcasts, music, etc) Ignore
 # Get media list
 mediaList = {}
 for libID in libraryDetails: 
-    if str(libID) not in ['10','13','14','4','1']:
+    if str(libID) not in excludedLibraries:
         libraryItems = requests.get(PLEX_URL + 'library/sections/' + libID + '/all' ,headers=headers)
     else:
         print('skipping excluded library')
