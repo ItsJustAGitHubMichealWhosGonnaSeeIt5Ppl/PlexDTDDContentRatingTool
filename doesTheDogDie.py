@@ -5,6 +5,8 @@ import os
 import emoji
 import sqlite3
 import re
+from modules.DTDD import dtddComments
+from modules.Plex import showTriggerIndexer
 # Will need DB for the following
 ## Media Libraries
 ### ID / Library Name / Library Type / DTDD Relevant tag
@@ -18,7 +20,7 @@ PLEX_URL = os.getenv('PLEX_URL') + ":32400/"
 PLEX_KEY = os.getenv('PLEX_KEY')
 
 # TODO #1 Move me to a place where I can be changed easily
-excludedLibraries = ['10','13','14','4']
+excludedLibraries = ['10','13','14','4','1']
 triggerIDWarn = [201,326]
 TriggerIDAlert = [182,292]
 triggerIDList = triggerIDWarn + TriggerIDAlert
@@ -144,16 +146,16 @@ def mediaCheck(plexitem):
                 return result
             # Failed to find match
         return 'No results'
-        
 
 
-    
+
     result = mediaMatch(plexitem,dtddResults)
     try:
         resultDict = json.loads(result['stats'])['topics']
     except:
         resultDict = False
     if result != 'No results' and resultDict !=False:
+        showDict = {}
         safe = 0
         conflict = 0
         triggersPresent = []
@@ -161,6 +163,25 @@ def mediaCheck(plexitem):
         for groups in detailedResult['allGroups']:
             for items in groups['topics']:
                 if items['TopicId'] in triggerIDList:
+                    commentCount = items['numComments']
+                    if plexitem['mediaTypeTrue'] == 'show' and int(commentCount) >= 1: # Check show comments
+                        data = showTriggerIndexer(plexitem['itemID'],items['ItemId'],items['TopicId'],showDict)
+                        """ comments = dtddComments(items['ItemId'],items['TopicId'])
+                        for comment in comments:
+                            if comment['yes'] > comment['no']:
+                                season = comment['index1']
+                                episode = comment['index2']
+                                TVShowSeasons = json.loads(requests.get(PLEX_URL + 'library/metadata/' + plexitem['itemID'] + '/children' ,headers=headers).content)
+                                for seasonPlex in TVShowSeasons['MediaContainer']['Metadata']:
+                                    if int(seasonPlex['index']) == int(season):
+                                        TVShowEpisodes = json.loads(requests.get(PLEX_URL + 'library/metadata/' + seasonPlex['ratingKey'] + '/children' ,headers=headers).content)
+                                        for episodePlex in TVShowEpisodes['MediaContainer']['Metadata']:
+                                            if int(episodePlex['index']) == int(episode):
+                                                request = f'library/sections/{plexitem["libraryID"]}/all?type=4&id={episodePlex["ratingKey"]}&includeExternalMedia=1&contentRating.value=Test'
+                                                attemptUpdate = requests.put(PLEX_URL + request, headers=headers) """
+
+
+
                     yesSum = items['yesSum']
                     noSum = items['noSum']
                     if yesSum == 0 and noSum == 0: # Unsure
@@ -270,3 +291,4 @@ title = Item title
 summary = summary text
 """
 print('aaa')
+

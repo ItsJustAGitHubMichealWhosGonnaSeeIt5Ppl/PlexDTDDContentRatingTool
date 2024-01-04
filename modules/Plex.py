@@ -5,7 +5,8 @@ import os
 import emoji
 import sqlite3
 import re
-from DTDD import dtddSearch
+from .DTDD import dtddSearch, dtddComments
+
 
 DTDD_QUERY_URL = 'https://www.doesthedogdie.com/dddsearch?q='
 DTDD_ID_URL = 'https://www.doesthedogdie.com/media/'
@@ -17,7 +18,10 @@ excludedLibraries = ['10','13','14','4']
 triggerIDWarn = [201,326]
 TriggerIDAlert = [182,292]
 triggerIDList = triggerIDWarn + TriggerIDAlert
-
+plexHeader = {
+  'Accept': 'application/json',
+  'X-Plex-Token': PLEX_KEY
+  }
 
     
 
@@ -53,7 +57,7 @@ def updatePlexItem(mediaDetails,TriggerIDs):
     else:
         ValueString = triggerString(TriggerIDs)
     request = f'library/sections/{mediaDetails["libraryID"]}/all?type=1&id={mediaDetails["itemID"]}&includeExternalMedia=1&contentRating.value={ValueString}'
-    attemptUpdate = requests.put(PLEX_URL + request, headers=headers)
+    attemptUpdate = requests.put(PLEX_URL + request, headers=plexHeader)
     print(attemptUpdate.status_code)
 
 
@@ -144,3 +148,34 @@ def confidenceScore(mediaItem,searchResults):
         # Else: Pass - Check next result item
         # Failed to find match
     return 'No results' # Only sent once all search results have been checked
+
+
+
+def showTriggerIndexer(showID,dtddID,triggerID,showDict):
+    """ Index TV show episodes for updating individual episode triggers once all triggers have been checked
+    
+    Season = index1
+    Episode = index2 
+    """
+    comments = dtddComments(dtddID,triggerID)
+    for comment in comments:
+        if comment['yes'] > comment['no']: # Verify comment is not downvoted.
+            tv = requests.get(PLEX_URL + 'library/metadata/' + showID + '/children' ,headers=plexHeader)
+            TVShowSeasons = json.loads(tv.content)
+            # TVShowSeasons = json.loads(requests.get(PLEX_URL + 'library/metadata/' + showID + '/children' ,headers=plexHeader).content)
+            for seasonPlex in TVShowSeasons['MediaContainer']['Metadata']:
+                if int(seasonPlex['index']) == int(comment['index1']): # Find correct season
+                    TVShowEpisodes = json.loads(requests.get(PLEX_URL + 'library/metadata/' + seasonPlex['ratingKey'] + '/children' ,headers=plexHeader).content) # Get season episodes
+                    for episodePlex in TVShowEpisodes['MediaContainer']['Metadata']: 
+                        if int(episodePlex['index']) == int(comment['index2']): # Find correct episode
+                            showDict.update({episodePlex["ratingKey"]: {
+                                'triggerIDs': showDict[episodePlex["ratingKey"]]['triggerIDs'].append(triggerID) if episodePlex["ratingKey"] in showDict else [triggerID],
+                                'comments': showDict[episodePlex["ratingKey"]]['comments'].append(comment['comment']) if episodePlex["ratingKey"] in showDict else [comment['comment']],
+                            }})
+                            break                
+                            
+                                               
+# request = f'library/sections/{plexitem["libraryID"]}/all?type=4&id={episodePlex["ratingKey"]}&includeExternalMedia=1&contentRating.value=Test'
+# attemptUpdate = requests.put(PLEX_URL + request, headers=plexHeader)
+    
+    

@@ -14,7 +14,11 @@ DTDD_KEY = os.getenv('DTDD_KEY')
 # /media/
 
 def dtddSearch(query,mode='Q'):
-    """ Search the DTDD API. Default mode is query, enter literally anything else to switch it. """
+    """ Search the DTDD API. Default mode is query, enter literally anything else to switch it. 
+    Modes:
+    Q = Query
+    C = Comment
+    """
     # Search by ID or text
     headers = {
     'Accept': 'application/json',
@@ -26,3 +30,23 @@ def dtddSearch(query,mode='Q'):
         return json.loads(response.content)
     else:
         return f'Failed to find item'
+def dtddComments(mediaID,triggerID):
+    """ Check comments for media item trigger.
+    """
+    headers = {
+    'Accept': 'application/json',
+    'X-API-KEY': DTDD_KEY
+    }
+    response = requests.get(DTDD_BASE + f'/topics/{triggerID}/media/{mediaID}/comments' ,headers = headers)
+
+    return json.loads(response.content)
+
+                    
+                
+            
+
+""" API DOCUMENTATION(?) 
+
+
+
+"""
