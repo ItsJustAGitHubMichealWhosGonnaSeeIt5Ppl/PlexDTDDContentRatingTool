@@ -5,3 +5,4 @@
 /pyvenv.cfg
 /exampleData.py
 **.db
+**pycache**

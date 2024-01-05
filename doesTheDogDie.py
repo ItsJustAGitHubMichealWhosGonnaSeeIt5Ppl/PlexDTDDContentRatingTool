@@ -6,12 +6,24 @@ import emoji
 import sqlite3
 import re
 from modules.DTDD import dtddComments
-from modules.Plex import showTriggerIndexer
+from modules.Plex import showTriggerIndexer, getPlexItem
 # Will need DB for the following
 ## Media Libraries
 ### ID / Library Name / Library Type / DTDD Relevant tag
 ## Media
 ### Media Name / Media ID / DTDD ID / Media Type ID 
+
+
+""" MAJOR REVAMP NEEDED
+Each library is checked and trigger strings are created.  Once done, these will all be sent to plex at once to update.
+
+
+Trigger Comments:
+
+dtddID[]
+Last Updated
+
+"""
 
 DTDD_QUERY_URL = 'https://www.doesthedogdie.com/dddsearch?q='
 DTDD_ID_URL = 'https://www.doesthedogdie.com/media/'
@@ -291,4 +303,8 @@ title = Item title
 summary = summary text
 """
 print('aaa')
+
+
+
+
 
