@@ -6,8 +6,9 @@ import emoji
 import sqlite3
 import re
 from modules.Plex import getPlexItem
-from modules.DTDD import dtddSearch
+from modules.DTDD import dtddSearch, dtddComments
 from modules.other import confidenceScore
+from datetime import date, datetime
 # Will need DB for the following
 ## Media Libraries
 ### ID / Library Name / Library Type / DTDD Relevant tag
@@ -22,8 +23,8 @@ Each library is checked and trigger strings are created.  Once done, these will 
 
 This will be the ammended description
 == DTDD Information ==
-Triggers:
-Comments:
+Triggers: 
+Comments
 - "[Comment Here]"
 
 dtddID[]
@@ -37,7 +38,7 @@ PLEX_URL = os.getenv('PLEX_URL') + ":32400/"
 PLEX_KEY = os.getenv('PLEX_KEY')
 
 
-excludedLibraries = ['10','13','14','4']
+excludedLibraries = ['10','13','14','4', '1']
 triggerIDWarn = [201,326]
 TriggerIDAlert = [182,292]
 triggerIDList = triggerIDWarn + TriggerIDAlert
@@ -102,7 +103,7 @@ for libraryID, libInfo in getPlexItem('libraries').items():
         }
 # Check media
 for item in mediaList.values():
-    triggersPresent = []
+    triggersPresent = {}
     if item['hasDTDD'] == False: # Search DTDD if no DTDD ID is available.
         search = dtddSearch(item['title'])
         dtddID = confidenceScore(item,search)
@@ -117,17 +118,42 @@ for item in mediaList.values():
         dtddID = item['dtddID']
     
     # Check if media even needs to be updated
+    # Date format: '2023-11-13T03:28:18.000Z'
+    
     dtddItem = dtddSearch(dtddID,'E')
-    if  item['hasDTDD'] == True and dtddItem['item']['updatedAt'] < item['dtddLastChecked']:
+    
+    if  item['hasDTDD'] == True and datetime.fromisoformat(dtddItem['item']['updatedAt']) < datetime.fromisoformat(item['dtddLastChecked']):
         continue #TODO #9 Update description with new date, change nothing else.
     
     # Check for triggers
     for triggerGroups in dtddItem['allGroups']:
             for triggerTopics in triggerGroups['topics']:
                 if triggerTopics['TopicId'] in triggerIDList and triggerTopics['yesSum'] > triggerTopics['noSum']:
-                    triggersPresent.append(triggerTopics['TopicId'])
+                    triggersPresent[triggerTopics['TopicId']] = {
+                        'yes': triggerTopics['yesSum'],
+                        'no': triggerTopics['noSum'],
+                    }
+                    
     # Add new information to mediaList dictionary
-    mediaList[item['itemID']].update({'possibleTriggers': triggersPresent if len(triggersPresent) > 0 else 'None','dtddLastChecked': 'today'})                
+    mediaList[item['itemID']].update({'possibleTriggers': triggersPresent if len(triggersPresent) > 0 else 'None','dtddLastChecked': 'today'})    
+    
+    
+    if len(triggersPresent) == 0:
+        continue # Safe 
+    
+    
+    
+    # Check for comments
+    commentList = []
+    for tID in item['possibleTriggers']: # Eventually I will shorten this but having it split up is helpful for debugging
+        comments = dtddComments(item["dtddID"],tID)
+        for comment in comments:
+            # Create comment string
+            rating = f'TID[{tID}] | ' + f':thumbs_up: {comment["yes"]} / {comment["no"]} :thumbs_down:' if comment['isVerified'] == False else f':check_mark_button:'
+            text = comment['comment']
+            # Add to list
+            commentList.append(f'{rating} {text}')
+    mediaList[item['itemID']].update({'comments': commentList})
     
     
     
