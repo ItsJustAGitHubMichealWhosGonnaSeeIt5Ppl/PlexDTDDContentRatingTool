@@ -24,7 +24,6 @@ plexHeader = {
   }
 
 
-
 def updatePlexItem(mediaType,mediaDetails,TriggerString,Description):
     """ Update a plex media library item """
     # TODO #5 Allow any field to be updated by accepting a table.

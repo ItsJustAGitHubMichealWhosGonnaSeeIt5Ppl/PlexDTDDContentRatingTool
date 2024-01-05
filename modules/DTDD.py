@@ -14,10 +14,11 @@ DTDD_KEY = os.getenv('DTDD_KEY')
 # /media/
 
 def dtddSearch(query,mode='Q'):
+    #TODO #7 add input validation
     """ Search the DTDD API. Default mode is query, enter literally anything else to switch it. 
     Modes:
     Q = Query
-    C = Comment
+    E = Expanded
     """
     # Search by ID or text
     headers = {
@@ -26,19 +27,21 @@ def dtddSearch(query,mode='Q'):
     }
     subString = '/dddsearch?q=' if mode.upper() == 'Q' else '/media/'
     response = requests.get(DTDD_BASE + subString + str(query) ,headers = headers)
-    if response.status_code == 200 and len(json.loads(response.content)['item']) > 0:
+    if response.status_code == 200 and len(json.loads(response.content)) > 0:
         return json.loads(response.content)
     else:
         return f'Failed to find item'
+    
+    
+
 def dtddComments(mediaID,triggerID):
-    """ Check comments for media item trigger.
+    """ Check comments for media item triggers.
     """
     headers = {
     'Accept': 'application/json',
     'X-API-KEY': DTDD_KEY
     }
     response = requests.get(DTDD_BASE + f'/topics/{triggerID}/media/{mediaID}/comments' ,headers = headers)
-
     return json.loads(response.content)
 
                     

@@ -105,10 +105,10 @@ def confidenceScore(mediaItem,searchResults):
             if result['name'].lower() == mediaItem['title'].lower():
                 confidence += 20
             if result['releaseYear'].isnumeric():
-                if int(result['releaseYear']) == int(plexitem['releaseYear']):
+                if int(result['releaseYear']) == int(mediaItem['releaseYear']):
                     confidence += 25
                 # Sometimes DTDD will return 'unknown' for the year. #TODO #3 Add better failure prevention to the confidence checker
-                elif int(result['releaseYear']) == int(plexitem['releaseYear'])+1 or int(result['releaseYear']) == int(plexitem['releaseYear'])-1:
+                elif int(result['releaseYear']) == int(mediaItem['releaseYear'])+1 or int(result['releaseYear']) == int(mediaItem['releaseYear'])-1:
                     confidence += 20
             break
         if confidence >= 80:

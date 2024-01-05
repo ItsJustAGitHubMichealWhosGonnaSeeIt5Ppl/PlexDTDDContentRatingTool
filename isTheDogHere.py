@@ -6,6 +6,8 @@ import emoji
 import sqlite3
 import re
 from modules.Plex import getPlexItem
+from modules.DTDD import dtddSearch
+from modules.other import confidenceScore
 # Will need DB for the following
 ## Media Libraries
 ### ID / Library Name / Library Type / DTDD Relevant tag
@@ -70,7 +72,7 @@ lastUpdateRE = re.compile('lastUpdated\\[(.*?)\\]')
 
 # Optimised Media list creation
 mediaList = {}
-for libraryID in getPlexItem('libraries'):
+for libraryID, libInfo in getPlexItem('libraries').items():
     if str(libraryID) in excludedLibraries:
         print('skipping excluded library')
         continue
@@ -79,11 +81,13 @@ for libraryID in getPlexItem('libraries'):
         # Extract GUID Tags for matching later
         guidDict = {}
         trackID = ''
-        for ids in item['Guid']:
-            guidDict[ids['id'].split('://')[0]] = ids['id'].split('://')[1]
+        if 'Guid' in item.keys(): # Prevents failure if item has just been added and not yet matched
+            for ids in item['Guid']:
+                guidDict[ids['id'].split('://')[0]] = ids['id'].split('://')[1]
         hasDTDD = True if '== DTDD Information ==' in item['summary'] else False
         mediaList[item['ratingKey']] = {
             'libraryID': libraryID,
+            'itemType': libInfo['libraryType'],
             'itemID': item['ratingKey'],
             'GUID': item['guid'], 
             'title': item['title'],
@@ -97,6 +101,41 @@ for libraryID in getPlexItem('libraries'):
             'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
         }
 # Check media
-
-for x in mediaList:
-    print(x)
+for item in mediaList.values():
+    triggersPresent = []
+    if item['hasDTDD'] == False: # Search DTDD if no DTDD ID is available.
+        search = dtddSearch(item['title'])
+        dtddID = confidenceScore(item,search)
+        if dtddID == 'No results':
+            mediaList[item['itemID']].update({'possibleTriggers': 'Unknown'})
+            continue #TODO #8 Create string explaining media could not be found
+        dtddConf = dtddID[1]
+        dtddID = dtddID[0]['id']
+        if dtddConf == 100: # 100 confident that media match is correct
+            mediaList[item['itemID']].update({'dtddID': dtddID}) 
+    else: # Temporary 
+        dtddID = item['dtddID']
+    
+    # Check if media even needs to be updated
+    dtddItem = dtddSearch(dtddID,'E')
+    if  item['hasDTDD'] == True and dtddItem['item']['updatedAt'] < item['dtddLastChecked']:
+        continue #TODO #9 Update description with new date, change nothing else.
+    
+    # Check for triggers
+    for triggerGroups in dtddItem['allGroups']:
+            for triggerTopics in triggerGroups['topics']:
+                if triggerTopics['TopicId'] in triggerIDList and triggerTopics['yesSum'] > triggerTopics['noSum']:
+                    triggersPresent.append(triggerTopics['TopicId'])
+    # Add new information to mediaList dictionary
+    mediaList[item['itemID']].update({'possibleTriggers': triggersPresent if len(triggersPresent) > 0 else 'None','dtddLastChecked': 'today'})                
+    
+    
+    
+    if item['itemType'] == 'movie':
+        pass
+    elif item['itemType'] == 'show':
+        """ Show overview of triggers on TV show main page, show overview of season triggers on each season page, show triggers by episode if applicable """
+        pass
+    else:
+        print(f'No matching media type for {item["itemType"]}')
+print('test')

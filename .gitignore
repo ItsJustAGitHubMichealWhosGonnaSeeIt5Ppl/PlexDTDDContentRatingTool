@@ -6,3 +6,5 @@
 /exampleData.py
 **.db
 **pycache**
+**__pycache__/*
+**__pycache__/*
