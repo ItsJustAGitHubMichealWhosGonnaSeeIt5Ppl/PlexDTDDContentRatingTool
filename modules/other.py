@@ -1,18 +1,9 @@
 """ Modules that do not fit in any of the others """
-import requests
-import urllib.parse
 import json
 import os
 import emoji
-import sqlite3
 import re
-from .DTDD import dtddSearch, dtddComments
-
-DTDD_QUERY_URL = 'https://www.doesthedogdie.com/dddsearch?q='
-DTDD_ID_URL = 'https://www.doesthedogdie.com/media/'
-DTDD_KEY = os.getenv('DTDD_KEY')
-PLEX_URL = os.getenv('PLEX_URL') + ":32400/"
-PLEX_KEY = os.getenv('PLEX_KEY')
+from datetime import datetime
 
 def triggerString(presentIDs,alertList,warnList):
     """ Returns a trigger string for media items. 
@@ -42,36 +33,6 @@ def triggerString(presentIDs,alertList,warnList):
     if alert == False and warn == False and eWarn == False:
         tString = f':check_mark:'
     return emoji.emojize(tString)
-
-
-
-def showTriggerIndexer(showID,dtddID,triggerID,showDict):
-    """ Index TV show episodes for updating individual episode triggers once all triggers have been checked
-    
-    Season = index1
-    Episode = index2 
-    """
-    plexHeader = {
-    'Accept': 'application/json',
-    'X-Plex-Token': PLEX_KEY
-    }
-    comments = dtddComments(dtddID,triggerID)
-    for comment in comments:
-        if comment['yes'] > comment['no']: # Verify comment is not downvoted.
-            tv = requests.get(PLEX_URL + 'library/metadata/' + showID + '/children' ,headers=plexHeader)
-            TVShowSeasons = json.loads(tv.content)
-            # TVShowSeasons = json.loads(requests.get(PLEX_URL + 'library/metadata/' + showID + '/children' ,headers=plexHeader).content)
-            for seasonPlex in TVShowSeasons['MediaContainer']['Metadata']:
-                if int(seasonPlex['index']) == int(comment['index1']): # Find correct season
-                    TVShowEpisodes = json.loads(requests.get(PLEX_URL + 'library/metadata/' + seasonPlex['ratingKey'] + '/children' ,headers=plexHeader).content) # Get season episodes
-                    for episodePlex in TVShowEpisodes['MediaContainer']['Metadata']: 
-                        if int(episodePlex['index']) == int(comment['index2']): # Find correct episode
-                            showDict.update({episodePlex["ratingKey"]: {
-                                'triggerIDs': showDict[episodePlex["ratingKey"]]['triggerIDs'].append(triggerID) if episodePlex["ratingKey"] in showDict else [triggerID],
-                                'comments': showDict[episodePlex["ratingKey"]]['comments'].append(comment['comment']) if episodePlex["ratingKey"] in showDict else [comment['comment']],
-                            }})
-                            break                
-                            
 
 
 def confidenceScore(mediaItem,searchResults):
@@ -148,8 +109,11 @@ def mediaDictCreator(item,mode,**extras):
     dtdd = {
         'hasDTDD': hasDTDD, # True/False.
         'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
-        'dtddLastChecked':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
-        'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
+        'dtddLastUpdated':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
+        'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else item['summary'] if 'summary' in item.keys() else '', # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
+        # Pre-create comment and trigger lists, makes updating them 1000x easier...
+        'comments': [],
+        'triggers': []
     }
     
     # Mode Dependant Items
@@ -174,16 +138,51 @@ def mediaDictCreator(item,mode,**extras):
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
     # https://datagy.io/python-merge-dictionaries/
 
+def triggerPlain(triggerID,triggerNames,mode=''):
+    """ Convert trigger IDs to pre-defined trigger names (optional) """
+    triggerID = int(triggerID)
+    if triggerID in triggerNames.keys():
+        return triggerNames[triggerID] if mode != 'shorten' else ''.join(x[:1] for x in triggerNames[triggerID].split(' '))# TODO #14 Allow acronym/first letter response
+    else:
+        return triggerID
+
+def descriptionCreator(mediaItem,tNames={}):
+    triggers = ''
+    tfind = re.compile('TID\\[(.*?)\\]')
+    """ Create descriptions for media items """
+    for trigger in mediaItem['triggers']:
+        tName = triggerPlain(trigger,tNames)
+        tVotes = f':thumbs_up: {mediaItem["triggers"][trigger]["yes"]} / {mediaItem["triggers"][trigger]["no"]} :thumbs_down: | '
+        if mediaItem['itemType'] == 'show':
+            pass # This will be used to add (S##E##) after triggers where relevant
+        triggers += f'- {tVotes}{tName}\n' 
+    # triggers = ('- ' + triggerPlain(trigger,tNames) for trigger in mediaItem['triggers']+ '\n')
+    comments = ''.join('- ' + str(tfind.sub(triggerPlain(tfind.search(comment).group(1),tNames,'shorten'), comment) +'\n') for comment in mediaItem['comments'])
+    updatedDescription = mediaItem['descriptionClean'] + f"""
 
 
-def trashMatch(queryKey,dataToSearch): 
-    """ match dictionary subitems in a trash way """
-    for data in dataToSearch:
-        if queryKey == data:
-            return data
-    
+== DTDD Information ==
+Triggers
+{triggers.strip()}
+Comments
+{comments}
 
+dtddID[{mediaItem['dtddID']}]
+lastUpdated[{str(datetime.now()).split(' ')[0]}]
+"""
+    return updatedDescription
 
-def dictMatch(source, **searchItem): 
-    """ match dictionary subitems """
-    
+def seriesCleaner(item):
+    sDel = []
+    for sID, sInf in item['seasons'].items():
+        eDel= []
+        if len(sInf['triggers']) == 0:
+            sDel.append(sID)
+            continue
+        for eID, eInf in sInf['episodes'].items():
+            if len(eInf['triggers']) == 0:
+                eDel.append(eID)
+        for eid in eDel:
+            sInf['episodes'].pop(eid)
+    for sid in sDel:
+        item['seasons'].pop(sid)

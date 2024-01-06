@@ -94,7 +94,6 @@ def getPlexTV(showID):
         seasons = json.loads(showRequest.content)
     for season in seasons['MediaContainer']['Metadata']:
         episodeDict = {}
-        episodeDictTest = {}
         seasonRequest = requests.get(PLEX_URL + 'library/metadata/' + season['ratingKey'] + '/children' ,headers=plexHeader)# Get season episodes
         if seasonRequest.status_code != 200:
             return 'Failed to get episodes'
