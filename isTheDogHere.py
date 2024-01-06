@@ -5,9 +5,9 @@ import os
 import emoji
 import sqlite3
 import re
-from modules.Plex import getPlexItem,getPlexTV
+from modules.Plex import getPlexItem,getPlexTV,updatePlexItem
 from modules.DTDD import dtddSearch, dtddComments
-from modules.other import confidenceScore, mediaDictCreator, descriptionCreator, seriesCleaner
+from modules.other import confidenceScore, mediaDictCreator, descriptionCreator, seriesCleaner, triggerString
 from datetime import date, datetime
 # Will need DB for the following
 ## Media Libraries
@@ -34,6 +34,14 @@ DTDD_ID_URL = 'https://www.doesthedogdie.com/media/'
 DTDD_KEY = os.getenv('DTDD_KEY')
 PLEX_URL = os.getenv('PLEX_URL') + ":32400/"
 PLEX_KEY = os.getenv('PLEX_KEY')
+
+
+plexHeader = {
+  'Accept': 'application/json',
+  'X-Plex-Token': PLEX_KEY
+}
+
+
 
 
 excludedLibraries = ['10','13','14','4', '1']
@@ -99,7 +107,7 @@ for item in mediaList.values():
     
     dtddItem = dtddSearch(dtddID,'E')
     
-    if  item['hasDTDD'] == True and datetime.fromisoformat(dtddItem['item']['updatedAt']) < datetime.fromisoformat(item['dtddLastUpdated']):
+    if  item['hasDTDD'] == True and datetime.fromisoformat(dtddItem['item']['updatedAt'].split('T')[0]) < datetime.fromisoformat(item['dtddLastUpdated']):
         continue #TODO #9 Update description with new date, change nothing else.
     
     # Check for triggers
@@ -119,8 +127,8 @@ for item in mediaList.values():
     if item['itemType'] == 'show': # TODO #10 Only scan all episode content if show gets flagged
         showInfo = getPlexTV(item['itemID'])
         mediaList[item['itemID']].update({'seasons': showInfo})
-    
-        
+
+
     def numNormaliser(inputNum):
         """ Creates consistent numbers for Season and Episode values 1 becomes 01, returned in string form
         """
@@ -144,15 +152,23 @@ for item in mediaList.values():
                     episodePath['triggers'].append(tID if tID not in episodePath['triggers'] else None) # Add triggers as they are only added to series during initial scans.
                     episodePath['comments'].append(f'{rating} {text}')
     
+    
+    if len(item['triggers']) == 0:
+        mediaList(item['itemID'])
     # From here on we are working under the assumption only items that need to be updated will be present
-    
-    
-    
     if item['itemType'] == 'show':
         seriesCleaner(item)
     
-    print(descriptionCreator(item,triggerSafeNames))    
-    
-    
+    mediaList[item['itemID']].update({'descriptionUpdated': descriptionCreator(item,triggerSafeNames),'triggerString': triggerString(item['triggers'],TriggerIDAlert,triggerIDWarn)})
+    if item['itemType'] == 'show':
+        updatePlexItem(item,item['libraryID'],2)
+        for sID,sVals in item['seasons'].items():
+            sVals.update({'descriptionUpdated': descriptionCreator(sVals,triggerSafeNames),'triggerString': triggerString(item['triggers'],TriggerIDAlert,triggerIDWarn)})
+            updatePlexItem(sVals,item['libraryID'],3)
+            for eIDs,eVals in sVals['episodes'].items():
+                eVals.update({'descriptionUpdated': descriptionCreator(eVals,triggerSafeNames),'triggerString': triggerString(item['triggers'],TriggerIDAlert,triggerIDWarn)})
+                updatePlexItem(eVals,item['libraryID'],4)
+    else:
+        updatePlexItem(item,item['libraryID'],1)
     print(f'No matching media type for {item["itemType"]}')
 print('test')

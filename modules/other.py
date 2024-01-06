@@ -32,7 +32,7 @@ def triggerString(presentIDs,alertList,warnList):
         tString += f':warning: - E'
     if alert == False and warn == False and eWarn == False:
         tString = f':check_mark:'
-    return emoji.emojize(tString)
+    return tString
 
 
 def confidenceScore(mediaItem,searchResults):
@@ -110,7 +110,7 @@ def mediaDictCreator(item,mode,**extras):
         'hasDTDD': hasDTDD, # True/False.
         'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
         'dtddLastUpdated':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
-        'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else item['summary'] if 'summary' in item.keys() else '', # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
+        'descriptionClean':item['summary'].split('== DTDD Information ==')[0] if hasDTDD == True else item['summary'] if 'summary' in item.keys() else '', # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
         # Pre-create comment and trigger lists, makes updating them 1000x easier...
         'comments': [],
         'triggers': []
@@ -151,10 +151,13 @@ def descriptionCreator(mediaItem,tNames={}):
     tfind = re.compile('TID\\[(.*?)\\]')
     """ Create descriptions for media items """
     for trigger in mediaItem['triggers']:
+        if trigger == None:
+            continue
         tName = triggerPlain(trigger,tNames)
-        tVotes = f':thumbs_up: {mediaItem["triggers"][trigger]["yes"]} / {mediaItem["triggers"][trigger]["no"]} :thumbs_down: | '
-        if mediaItem['itemType'] == 'show':
-            pass # This will be used to add (S##E##) after triggers where relevant
+        if isinstance(trigger,list) == True:
+            tVotes = f':thumbs_up: {mediaItem["triggers"][trigger]["yes"]} / {mediaItem["triggers"][trigger]["no"]} :thumbs_down: | '
+        else:
+            tVotes = f''
         triggers += f'- {tVotes}{tName}\n' 
     # triggers = ('- ' + triggerPlain(trigger,tNames) for trigger in mediaItem['triggers']+ '\n')
     comments = ''.join('- ' + str(tfind.sub(triggerPlain(tfind.search(comment).group(1),tNames,'shorten'), comment) +'\n') for comment in mediaItem['comments'])

@@ -5,7 +5,7 @@ import os
 import emoji
 import sqlite3
 import re
-from .other import mediaDictCreator
+from .other import mediaDictCreator, triggerString
 #from .DTDD import dtddSearch, dtddComments
 
 
@@ -25,14 +25,19 @@ plexHeader = {
   }
 
 
-def updatePlexItem(mediaType,mediaDetails,TriggerString,Description):
-    """ Update a plex media library item """
+def updatePlexItem(item,libID, itemType):
+    """ Update a plex media library item 
+    ### Valid Item Types
+    - Movie: 1
+    - TV Series: 2
+    - TV Season: ?
+    - TV Episode: 4
+    """
+    desc = emoji.emojize(item["descriptionUpdated"]).replace('&','and')
     # TODO #5 Allow any field to be updated by accepting a table.
-    request = f'library/sections/{mediaDetails["libraryID"]}/all?type={1 if mediaType == "movie" else 4}&id={mediaDetails["itemID"]}&includeExternalMedia=1&contentRating.value={TriggerString}'
+    request = f'library/sections/{libID}/all?type={itemType}&id={item["itemID"]}&includeExternalMedia=1&summary.value={desc}&contentRating.value={emoji.emojize(item["triggerString"])}'
     attemptUpdate = requests.put(PLEX_URL + request, headers=plexHeader)
     print(attemptUpdate.status_code)
-
-
 
 def getPlexItem(getType,ID=None,raw=False):
     """ Get plex library items.
