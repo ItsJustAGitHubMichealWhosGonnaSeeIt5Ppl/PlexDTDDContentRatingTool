@@ -116,3 +116,61 @@ def confidenceScore(mediaItem,searchResults):
         # Else: Pass - Check next result item
         # Failed to find match
     return 'No results' # Only sent once all search results have been checked
+
+
+
+def mediaDictCreator(item,mode,**extras):
+    """ Create media dictionary items 
+    ### Modes
+    default - Default mode, contains all fields
+    single - 
+    tvSeries - TV Series Mode
+    tvSeason - TV Season Mode
+    tvEpisode - TV Episode Mode
+    """
+    def argCheck(name,item=None):
+        if item == None:
+            item = extras
+        """ Checks for item in **extras"""
+        return item[name] if name in item else None
+    # Common across all types of request
+    common = {
+        'itemID': item['ratingKey'],
+        'title': item['title'],
+        'description':item['summary'] if 'summary' in item.keys() else '',   
+    }
+    
+    # DTDD dict items
+    # Regex queries to be used when finding media information.
+    dtddRE = re.compile('dtddID\\[(.*?)\\]')
+    lastUpdateRE = re.compile('lastUpdated\\[(.*?)\\]')
+    hasDTDD = True if '== DTDD Information ==' in (item['summary'] if 'summary' in item.keys() else '') else False
+    dtdd = {
+        'hasDTDD': hasDTDD, # True/False.
+        'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
+        'dtddLastChecked':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
+        'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
+    }
+    
+    # Mode Dependant Items
+    
+    if mode.lower() == 'default':
+        additionalItems = {
+            'libraryID': argCheck('lidID'),
+            'itemType': argCheck('libInfo'),
+            'GUID': item['guid'],
+            'releaseYear': item['year'],
+            'mediaTypeTrue': item['type'],
+            'dbIDs': argCheck('gDict'), # Helps when matching media 
+        }
+    elif mode.lower() == 'tvSeries':
+        additionalItems = {'seasons': argCheck('seasonsDict')}
+    elif mode.lower() == 'tvSeason':
+        additionalItems = {'episodes': argCheck('episodesDict')}
+    else:
+        additionalItems = {}
+    return common | additionalItems | dtdd
+    ### I had never heard of "|" before this project. Thanks to the following articles
+    # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
+    # https://datagy.io/python-merge-dictionaries/
+

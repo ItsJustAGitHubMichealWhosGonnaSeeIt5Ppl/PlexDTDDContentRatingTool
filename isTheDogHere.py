@@ -5,9 +5,9 @@ import os
 import emoji
 import sqlite3
 import re
-from modules.Plex import getPlexItem
+from modules.Plex import getPlexItem,getPlexTV
 from modules.DTDD import dtddSearch, dtddComments
-from modules.other import confidenceScore
+from modules.other import confidenceScore, mediaDictCreator
 from datetime import date, datetime
 # Will need DB for the following
 ## Media Libraries
@@ -18,8 +18,6 @@ from datetime import date, datetime
 
 """ MAJOR REVAMP NEEDED
 Each library is checked and trigger strings are created.  Once done, these will all be sent to plex at once to update.
-
-
 
 This will be the ammended description
 == DTDD Information ==
@@ -73,12 +71,13 @@ lastUpdateRE = re.compile('lastUpdated\\[(.*?)\\]')
 
 # Optimised Media list creation
 mediaList = {}
+mediaListTest = {}
 for libraryID, libInfo in getPlexItem('libraries').items():
     if str(libraryID) in excludedLibraries:
         print('skipping excluded library')
         continue
     for itemID in getPlexItem('libraryItems',libraryID):
-        item = getPlexItem('libraryItem',itemID)
+        item = getPlexItem('libraryItem',itemID['ratingKey'])
         # Extract GUID Tags for matching later
         guidDict = {}
         trackID = ''
@@ -86,7 +85,10 @@ for libraryID, libInfo in getPlexItem('libraries').items():
             for ids in item['Guid']:
                 guidDict[ids['id'].split('://')[0]] = ids['id'].split('://')[1]
         hasDTDD = True if '== DTDD Information ==' in item['summary'] else False
-        mediaList[item['ratingKey']] = {
+        
+        
+        mediaList[item['ratingKey']] = mediaDictCreator(item,'default',gDict=guidDict,libID=libraryID,libInf=libInfo['libraryType'])
+        """ mediaList[item['ratingKey']] = {
             'libraryID': libraryID,
             'itemType': libInfo['libraryType'],
             'itemID': item['ratingKey'],
@@ -100,7 +102,13 @@ for libraryID, libInfo in getPlexItem('libraries').items():
             'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
             'dtddLastChecked':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
             'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
-        }
+        } """
+        if libInfo['libraryType'] == 'show': # TODO #10 Only scan all episode content if show gets flagged
+            showInfo = getPlexTV(item['ratingKey'])
+            mediaList[item['itemID']].update({'seasons': showInfo})
+            
+            
+            
 # Check media
 for item in mediaList.values():
     triggersPresent = {}
