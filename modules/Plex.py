@@ -5,6 +5,7 @@ import os
 import emoji
 import sqlite3
 import re
+from .other import mediaDictCreator
 #from .DTDD import dtddSearch, dtddComments
 
 
@@ -81,11 +82,11 @@ def getPlexItem(getType,ID=None,raw=False):
 
 
 def getPlexTV(showID):
-    dtddRE = re.compile('dtddID\\[(.*?)\\]')
-    lastUpdateRE = re.compile('lastUpdated\\[(.*?)\\]')
-    seasonDict = {}
     """ Get entire TV show information (all episodes) """
+    
+    seasonDict = {}
     showRequest = requests.get(PLEX_URL + 'library/metadata/' + showID + '/children' ,headers=plexHeader)
+    
     # TVShowSeasons = json.loads(requests.get(PLEX_URL + 'library/metadata/' + showID + '/children' ,headers=plexHeader).content)
     if showRequest.status_code != 200:
         return 'Failed to get show'
@@ -93,6 +94,7 @@ def getPlexTV(showID):
         seasons = json.loads(showRequest.content)
     for season in seasons['MediaContainer']['Metadata']:
         episodeDict = {}
+        episodeDictTest = {}
         seasonRequest = requests.get(PLEX_URL + 'library/metadata/' + season['ratingKey'] + '/children' ,headers=plexHeader)# Get season episodes
         if seasonRequest.status_code != 200:
             return 'Failed to get episodes'
@@ -100,29 +102,12 @@ def getPlexTV(showID):
             episodes = json.loads(seasonRequest.content)
             
         for episode in episodes['MediaContainer']['Metadata']:
+            print(f'{season["parentTitle"]} - S{season["index"]}E{episode["index"]}')
             episdodeDetails = getPlexItem('libraryitem',episode['ratingKey'])
-            hasDTDD = True if '== DTDD Information ==' in (episdodeDetails['summary'] if 'summary' in episdodeDetails.keys() else '') else False
-            episodeDict[episode['index']] = {
-                'itemID': episdodeDetails['ratingKey'],
-                'title': episdodeDetails['title'],
-                'description':episdodeDetails['summary'],
-                'mediaTypeTrue': episdodeDetails['type'],
-                'hasDTDD': hasDTDD, # True/False.
-                'dtddID':dtddRE.search(episdodeDetails['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
-                'dtddLastChecked':lastUpdateRE.search(episdodeDetails['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
-                'descriptionClean':episdodeDetails['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
-                }
+            episodeDict[episode['index']] = mediaDictCreator(episdodeDetails,'tvEpisode')
         
-        hasDTDD = True if '== DTDD Information ==' in (season['summary'] if 'summary' in season.keys() else '') else False
-        seasonDict[season['index']] = {
-            'itemID': season['ratingKey'],
-            'title': season['title'],
-            'description':season['summary'],
-            'episodes': episodeDict,
-            'hasDTDD': hasDTDD, # True/False.
-            'dtddLastChecked':lastUpdateRE.search(season['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
-            'descriptionClean':season['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
-            }
+        seasonDict[season['index']] = mediaDictCreator(season,'tvSeason',MDCepisodes=episodeDict)
+    return seasonDict
 
     
 

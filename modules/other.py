@@ -122,17 +122,17 @@ def confidenceScore(mediaItem,searchResults):
 def mediaDictCreator(item,mode,**extras):
     """ Create media dictionary items 
     ### Modes
-    default - Default mode, contains all fields
-    single - 
-    tvSeries - TV Series Mode
-    tvSeason - TV Season Mode
-    tvEpisode - TV Episode Mode
+    - default - Default mode, contains all fields
+    - single -
+    - tvSeries - TV Series Mode
+    - tvSeason - TV Season Mode
+    - tvEpisode - TV Episode Mode
     """
     def argCheck(name,item=None):
         if item == None:
             item = extras
         """ Checks for item in **extras"""
-        return item[name] if name in item else None
+        return item[name] if name in item.keys() else None
     # Common across all types of request
     common = {
         'itemID': item['ratingKey'],
@@ -156,17 +156,17 @@ def mediaDictCreator(item,mode,**extras):
     
     if mode.lower() == 'default':
         additionalItems = {
-            'libraryID': argCheck('lidID'),
-            'itemType': argCheck('libInfo'),
+            'libraryID': argCheck('libID'),
+            'itemType': argCheck('libInf'),
             'GUID': item['guid'],
             'releaseYear': item['year'],
             'mediaTypeTrue': item['type'],
             'dbIDs': argCheck('gDict'), # Helps when matching media 
         }
-    elif mode.lower() == 'tvSeries':
+    elif mode.lower() == 'tvseries':
         additionalItems = {'seasons': argCheck('seasonsDict')}
-    elif mode.lower() == 'tvSeason':
-        additionalItems = {'episodes': argCheck('episodesDict')}
+    elif mode.lower() == 'tvseason':
+        additionalItems = {'episodes': argCheck('MDCepisodes')}
     else:
         additionalItems = {}
     return common | additionalItems | dtdd
@@ -174,3 +174,16 @@ def mediaDictCreator(item,mode,**extras):
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
     # https://datagy.io/python-merge-dictionaries/
 
+
+
+def trashMatch(queryKey,dataToSearch): 
+    """ match dictionary subitems in a trash way """
+    for data in dataToSearch:
+        if queryKey == data:
+            return data
+    
+
+
+def dictMatch(source, **searchItem): 
+    """ match dictionary subitems """
+    

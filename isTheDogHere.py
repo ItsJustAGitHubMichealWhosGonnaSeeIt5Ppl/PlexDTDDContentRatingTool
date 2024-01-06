@@ -7,7 +7,7 @@ import sqlite3
 import re
 from modules.Plex import getPlexItem,getPlexTV
 from modules.DTDD import dtddSearch, dtddComments
-from modules.other import confidenceScore, mediaDictCreator
+from modules.other import confidenceScore, mediaDictCreator, trashMatch
 from datetime import date, datetime
 # Will need DB for the following
 ## Media Libraries
@@ -65,13 +65,8 @@ mediaDict = {
 
 """  """
 
-# Regex queries to be used when finding media information.
-dtddRE = re.compile('dtddID\\[(.*?)\\]')
-lastUpdateRE = re.compile('lastUpdated\\[(.*?)\\]')
-
 # Optimised Media list creation
 mediaList = {}
-mediaListTest = {}
 for libraryID, libInfo in getPlexItem('libraries').items():
     if str(libraryID) in excludedLibraries:
         print('skipping excluded library')
@@ -83,30 +78,10 @@ for libraryID, libInfo in getPlexItem('libraries').items():
         trackID = ''
         if 'Guid' in item.keys(): # Prevents failure if item has just been added and not yet matched
             for ids in item['Guid']:
-                guidDict[ids['id'].split('://')[0]] = ids['id'].split('://')[1]
-        hasDTDD = True if '== DTDD Information ==' in item['summary'] else False
-        
+                guidDict[ids['id'].split('://')[0]] = ids['id'].split('://')[1]        
         
         mediaList[item['ratingKey']] = mediaDictCreator(item,'default',gDict=guidDict,libID=libraryID,libInf=libInfo['libraryType'])
-        """ mediaList[item['ratingKey']] = {
-            'libraryID': libraryID,
-            'itemType': libInfo['libraryType'],
-            'itemID': item['ratingKey'],
-            'GUID': item['guid'], 
-            'title': item['title'],
-            'description':item['summary'],
-            'releaseYear': item['year'],
-            'mediaTypeTrue': item['type'],
-            'dbIDs': guidDict, # Helps when matching media
-            'hasDTDD': hasDTDD, # True/False.
-            'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
-            'dtddLastChecked':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
-            'descriptionClean':item['summary'].split('== DTDD Information ==') if hasDTDD == True else False # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
-        } """
-        if libInfo['libraryType'] == 'show': # TODO #10 Only scan all episode content if show gets flagged
-            showInfo = getPlexTV(item['ratingKey'])
-            mediaList[item['itemID']].update({'seasons': showInfo})
-            
+
             
             
 # Check media
@@ -141,14 +116,16 @@ for item in mediaList.values():
                         'yes': triggerTopics['yesSum'],
                         'no': triggerTopics['noSum'],
                     }
-                    
     # Add new information to mediaList dictionary
     mediaList[item['itemID']].update({'possibleTriggers': triggersPresent if len(triggersPresent) > 0 else 'None','dtddLastChecked': 'today'})    
-    
-    
     if len(triggersPresent) == 0:
         continue # Safe 
+    # Check if item is TV show, will effect comment scanning.
+    if item['itemType'] == 'show': # TODO #10 Only scan all episode content if show gets flagged
+        showInfo = getPlexTV(item['itemID'])
+        mediaList[item['itemID']].update({'seasons': showInfo})
     
+        
     
     
     # Check for comments
@@ -160,7 +137,20 @@ for item in mediaList.values():
             rating = f'TID[{tID}] | ' + f':thumbs_up: {comment["yes"]} / {comment["no"]} :thumbs_down:' if comment['isVerified'] == False else f':check_mark_button:'
             text = comment['comment']
             # Add to list
+            if item['itemType'] == 'show' and comment['index1'] != -1:
+                def numNormaliser(inputNum):
+                    """ Creates consistent numbers for Season and Episode values 1 becomes 01, returned in string form
+                    """
+                    return str(inputNum) if inputNum > 9 else '0' + str(inputNum)
+                rating = f'S{numNormaliser(comment["index1"])}E{numNormaliser(comment["index2"])} | ' + rating
+                episodePath = mediaList[item['itemID']]['seasons'][comment["index1"]]['episodes'][comment["index2"]]
+                oldComments = episodePath['comments'] if 'comments' in episodePath else []
+                oldComments.append(f'{rating} {text}')
+                mediaList[item['itemID']]['seasons'][comment["index1"]]['episodes'][comment["index2"]].update({'comments': oldComments})
+                print(12)
             commentList.append(f'{rating} {text}')
+            
+
     mediaList[item['itemID']].update({'comments': commentList})
     
     
