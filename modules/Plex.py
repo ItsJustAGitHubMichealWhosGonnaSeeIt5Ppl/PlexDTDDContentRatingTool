@@ -5,9 +5,7 @@ import os
 import emoji
 import sqlite3
 import re
-from .other import mediaDictCreator, triggerString
-#from .DTDD import dtddSearch, dtddComments
-
+from .other import mediaDictCreator
 
 DTDD_QUERY_URL = 'https://www.doesthedogdie.com/dddsearch?q='
 DTDD_ID_URL = 'https://www.doesthedogdie.com/media/'
@@ -86,7 +84,7 @@ def getPlexItem(getType,ID=None,raw=False):
 
 
 
-def getPlexTV(showID):
+def getPlexTV(showID,**extra):
     """ Get entire TV show information (all episodes) """
     
     seasonDict = {}
@@ -108,9 +106,9 @@ def getPlexTV(showID):
         for episode in episodes['MediaContainer']['Metadata']:
             print(f'{season["parentTitle"]} - S{season["index"]}E{episode["index"]}')
             episdodeDetails = getPlexItem('libraryitem',episode['ratingKey'])
-            episodeDict[episode['index']] = mediaDictCreator(episdodeDetails,'tvEpisode')
+            episodeDict[episode['index']] = mediaDictCreator(episdodeDetails,'tvEpisode',dtddParent=extra['dtddParentID'])
         
-        seasonDict[season['index']] = mediaDictCreator(season,'tvSeason',MDCepisodes=episodeDict)
+        seasonDict[season['index']] = mediaDictCreator(season,'tvSeason',MDCepisodes=episodeDict,dtddParent=extra['dtddParentID'])
     return seasonDict
 
     

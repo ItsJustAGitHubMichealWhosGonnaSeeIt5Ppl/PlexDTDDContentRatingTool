@@ -44,7 +44,7 @@ plexHeader = {
 
 
 
-excludedLibraries = ['10','13','14','4', '1']
+excludedLibraries = ['10','13','14','4']
 triggerIDWarn = [201,326]
 TriggerIDAlert = [182,292]
 triggerIDList = triggerIDWarn + TriggerIDAlert
@@ -89,7 +89,7 @@ for libraryID, libInfo in getPlexItem('libraries').items():
 # Check media
 for item in mediaList.values():
     triggersPresent = {}
-    if item['hasDTDD'] == False: # Search DTDD if no DTDD ID is available.
+    if item['hasDTDD'] == False or item['dtddID'] == 'no ID': # Search DTDD if no DTDD ID is available.
         search = dtddSearch(item['title'])
         dtddID = confidenceScore(item,search)
         if dtddID == 'No results':
@@ -108,6 +108,7 @@ for item in mediaList.values():
     dtddItem = dtddSearch(dtddID,'E')
     
     if  item['hasDTDD'] == True and datetime.fromisoformat(dtddItem['item']['updatedAt'].split('T')[0]) < datetime.fromisoformat(item['dtddLastUpdated']):
+        print('already updated')
         continue #TODO #9 Update description with new date, change nothing else.
     
     # Check for triggers
@@ -125,7 +126,7 @@ for item in mediaList.values():
     
     # Check if item is TV show, will effect comment scanning.
     if item['itemType'] == 'show': # TODO #10 Only scan all episode content if show gets flagged
-        showInfo = getPlexTV(item['itemID'])
+        showInfo = getPlexTV(item['itemID'],dtddParentID=dtddID)
         mediaList[item['itemID']].update({'seasons': showInfo})
 
 

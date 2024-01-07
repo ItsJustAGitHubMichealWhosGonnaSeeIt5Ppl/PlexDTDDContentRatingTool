@@ -105,11 +105,11 @@ def mediaDictCreator(item,mode,**extras):
     # Regex queries to be used when finding media information.
     dtddRE = re.compile('dtddID\\[(.*?)\\]')
     lastUpdateRE = re.compile('lastUpdated\\[(.*?)\\]')
-    hasDTDD = True if '== DTDD Information ==' in (item['summary'] if 'summary' in item.keys() else '') else False
+    hasDTDD = True if '== DTDD Information ==' in (item['summary'] if 'summary' in item.keys() else '') else True if argCheck('dtddParent') != False and 'parentKey' in item else False
     dtdd = {
         'hasDTDD': hasDTDD, # True/False.
-        'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. 
-        'dtddLastUpdated':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
+        'dtddID':dtddRE.search(item['summary']).group(1) if hasDTDD == True and 'parentKey' not in item else argCheck('dtddParent') if argCheck('dtddParent') != False else 'no ID', # Only filled in if hasDTDD is True. 
+        'dtddLastUpdated':lastUpdateRE.search(item['summary']).group(1) if hasDTDD == True and 'parentKey' not in item else False, # Only filled in if hasDTDD is True. Shows last date that information was checked for this item
         'descriptionClean':item['summary'].split('== DTDD Information ==')[0] if hasDTDD == True else item['summary'] if 'summary' in item.keys() else '', # Only filled in if hasDTDD is True.  Description without the DTDD warnings, helpful when recreating it later
         # Pre-create comment and trigger lists, makes updating them 1000x easier...
         'comments': [],
@@ -154,7 +154,8 @@ def descriptionCreator(mediaItem,tNames={}):
         if trigger == None:
             continue
         tName = triggerPlain(trigger,tNames)
-        if isinstance(trigger,list) == True:
+        # if isinstance(mediaItem['triggers'][trigger],dict) == True:
+        if isinstance(mediaItem['triggers'],list) == False:
             tVotes = f':thumbs_up: {mediaItem["triggers"][trigger]["yes"]} / {mediaItem["triggers"][trigger]["no"]} :thumbs_down: | '
         else:
             tVotes = f''
@@ -166,7 +167,7 @@ def descriptionCreator(mediaItem,tNames={}):
 
 == DTDD Information ==
 Triggers
-{triggers.strip()}
+{triggers}
 Comments
 {comments}
 
